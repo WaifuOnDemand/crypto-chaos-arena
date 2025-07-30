@@ -18,6 +18,9 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        neon: "bg-accent text-accent-foreground shadow-[0_0_20px_hsl(var(--accent)/0.5)] hover:shadow-[0_0_30px_hsl(var(--accent)/0.8)] border border-accent/30",
+        crypto: "bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.6)] border border-primary/30",
+        game: "bg-card text-card-foreground border-2 border-primary/50 hover:border-primary hover:shadow-[0_0_15px_hsl(var(--primary)/0.4)]",
       },
       size: {
         default: "h-10 px-4 py-2",
