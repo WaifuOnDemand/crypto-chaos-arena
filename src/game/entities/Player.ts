@@ -283,10 +283,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       const velocityX = finalX * weapon.config.projectileSpeed;
       const velocityY = finalY * weapon.config.projectileSpeed;
       
+      // Spawn projectile slightly ahead of player
+      const spawnOffsetX = this.playerState.facing === 'right' ? 20 : -20;
+      const spawnX = this.x + spawnOffsetX;
+      const spawnY = this.y - 5; // Slightly above center
+      
       const projectileState = {
         id: `${this.playerState.id}_${time}_${i}`,
-        x: this.x,
-        y: this.y,
+        x: spawnX,
+        y: spawnY,
         velocityX,
         velocityY,
         damage: weapon.state.damage,
@@ -299,8 +304,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       
       const projectile = new Projectile(
         this.scene,
-        this.x,
-        this.y,
+        spawnX,
+        spawnY,
         velocityX,
         velocityY,
         projectileState

@@ -167,6 +167,11 @@ export class GameScene extends Phaser.Scene {
       new WeaponSpawn(this, 1100, height - 200),
       new WeaponSpawn(this, 500, height - 350),
     ];
+    
+    // Add debug key to toggle physics debug
+    this.input.keyboard!.addKey('F1').on('down', () => {
+      this.physics.world.debugGraphic.visible = !this.physics.world.debugGraphic.visible;
+    });
   }
 
   private setupCombatEvents(): void {

@@ -37,7 +37,7 @@ export class GameManager {
         default: 'arcade',
         arcade: {
           gravity: { x: 0, y: this.config.physics.gravity },
-          debug: process.env.NODE_ENV === 'development',
+          debug: false, // Disable debug physics bodies
         },
       },
       scene: [MenuScene, GameScene, HUDScene],

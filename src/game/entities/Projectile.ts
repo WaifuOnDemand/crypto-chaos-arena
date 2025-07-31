@@ -30,6 +30,13 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
       (this.body as Phaser.Physics.Arcade.Body).setSize(4, 4);
       this.setCollideWorldBounds(true);
       (this.body as Phaser.Physics.Arcade.Body).onWorldBounds = true;
+      
+      // Disable gravity for projectiles (except grenades)
+      if (projectileState.weaponType !== 'grenade') {
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity
+      } else {
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(200); // Reduced gravity for grenades
+      }
     }
 
     // Create visual based on projectile type
