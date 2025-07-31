@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
+import { Projectile } from '../entities/Projectile';
+import { WeaponSpawn } from '../entities/WeaponSpawn';
 import { GameControls } from '../../types/game';
 
 export class GameScene extends Phaser.Scene {
@@ -9,6 +11,8 @@ export class GameScene extends Phaser.Scene {
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private shiftKey!: Phaser.Input.Keyboard.Key;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private projectiles!: Phaser.Physics.Arcade.Group;
+  private weaponSpawns!: WeaponSpawn[];
   private gameTime: number = 300; // 5 minutes in seconds
   private gameTimer!: Phaser.Time.TimerEvent;
 
@@ -47,8 +51,21 @@ export class GameScene extends Phaser.Scene {
     // Create player
     this.player = new Player(this, 100, height - 100, 'player1');
     
+    // Create projectiles group
+    this.projectiles = this.physics.add.group();
+    
+    // Create weapon spawns
+    this.createWeaponSpawns();
+    
     // Set up collisions
     this.physics.add.collider(this.player, this.platforms);
+    this.physics.add.collider(this.projectiles, this.platforms, this.handleProjectileHit, undefined, this);
+    this.physics.add.overlap(this.player, this.projectiles, this.handlePlayerHit, undefined, this);
+    
+    // Set up weapon pickup collisions
+    this.weaponSpawns.forEach(spawn => {
+      this.physics.add.overlap(this.player, spawn, this.handleWeaponPickup, undefined, this);
+    });
     
     // Set up controls
     this.setupControls();
@@ -63,6 +80,9 @@ export class GameScene extends Phaser.Scene {
     
     // Add some visual effects
     this.addParticles();
+    
+    // Set up combat events
+    this.setupCombatEvents();
   }
 
   private setupControls(): void {
@@ -139,6 +159,75 @@ export class GameScene extends Phaser.Scene {
     particles.setAlpha(0.3);
   }
 
+  private createWeaponSpawns(): void {
+    const { width, height } = this.cameras.main;
+    this.weaponSpawns = [
+      new WeaponSpawn(this, 300, height - 150),
+      new WeaponSpawn(this, 700, height - 250),
+      new WeaponSpawn(this, 1100, height - 200),
+      new WeaponSpawn(this, 500, height - 350),
+    ];
+  }
+
+  private setupCombatEvents(): void {
+    this.game.events.on('projectileCreated', (projectile: Projectile) => {
+      this.projectiles.add(projectile);
+    });
+
+    this.game.events.on('meleeAttack', (attack: any) => {
+      // Check if any players are in melee range (simplified for MVP)
+      console.log('Melee attack at', attack.x, attack.y);
+    });
+
+    this.game.events.on('explosion', (explosion: any) => {
+      // Handle explosion damage (simplified for MVP)
+      const distance = Phaser.Math.Distance.Between(
+        this.player.x, this.player.y,
+        explosion.x, explosion.y
+      );
+      
+      if (distance <= explosion.radius && explosion.playerId !== this.player.playerState.id) {
+        const damage = Math.max(0, explosion.damage * (1 - distance / explosion.radius));
+        this.player.takeDamage(damage);
+      }
+    });
+  }
+
+  private handleProjectileHit(projectile: any, platform: any): void {
+    if (projectile instanceof Projectile) {
+      projectile.hit();
+    }
+  }
+
+  private handlePlayerHit(player: any, projectile: any): void {
+    if (projectile instanceof Projectile && projectile.projectileState.playerId !== this.player.playerState.id) {
+      this.player.takeDamage(projectile.projectileState.damage);
+      projectile.hit();
+    }
+  }
+
+  private handleWeaponPickup(player: any, spawn: any): void {
+    if (spawn instanceof WeaponSpawn && spawn.isAvailable()) {
+      const weaponType = spawn.pickup();
+      if (weaponType && this.player.addWeapon(weaponType)) {
+        // Success feedback
+        const pickupText = this.add.text(spawn.x, spawn.y - 30, `+${weaponType.toUpperCase()}`, {
+          fontSize: '16px',
+          color: '#00ff88',
+          fontFamily: 'monospace',
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+          targets: pickupText,
+          y: spawn.y - 60,
+          alpha: 0,
+          duration: 1000,
+          onComplete: () => pickupText.destroy(),
+        });
+      }
+    }
+  }
+
   update(time: number, delta: number): void {
     // Update controls
     const controls: Partial<GameControls> = {
@@ -147,6 +236,7 @@ export class GameScene extends Phaser.Scene {
       jump: Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasdKeys.W) || Phaser.Input.Keyboard.JustDown(this.spaceKey),
       dash: Phaser.Input.Keyboard.JustDown(this.shiftKey),
       fire: this.input.activePointer.isDown,
+      switchWeapon: Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey('Q')),
       aim: {
         x: this.input.activePointer.worldX,
         y: this.input.activePointer.worldY,
@@ -155,5 +245,15 @@ export class GameScene extends Phaser.Scene {
     
     this.player.updateControls(controls);
     this.player.update(time, delta);
+    
+    // Update weapon spawns
+    this.weaponSpawns.forEach(spawn => spawn.update(time, delta));
+    
+    // Update projectiles
+    this.projectiles.children.entries.forEach(projectile => {
+      if (projectile instanceof Projectile) {
+        projectile.update(time, delta);
+      }
+    });
   }
 }

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { PlayerState, GameControls } from '../../types/game';
+import { Weapon } from './Weapon';
+import { Projectile } from './Projectile';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   public playerState: PlayerState;
@@ -7,6 +9,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private dashCooldownTimer: number = 0;
   private jumpCount: number = 0;
   private maxJumps: number = 2;
+  private weapons: Weapon[] = [];
+  private activeWeaponIndex: number = -1;
+  private meleeWeapon: Weapon;
 
   constructor(scene: Phaser.Scene, x: number, y: number, playerId: string) {
     super(scene, x, y, 'player');
@@ -30,6 +35,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       dashCooldown: 0,
       facing: 'right',
     };
+
+    // Initialize with knife
+    this.meleeWeapon = new Weapon('knife');
 
     this.controls = {
       left: false,
@@ -75,6 +83,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.updateMovement(delta);
     this.updateTimers(delta);
     this.updatePlayerState();
+    this.handleCombat(time);
     
     // Emit player update event for HUD
     this.scene.game.events.emit('playerUpdate', this.playerState);
@@ -195,6 +204,168 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.enable = true;
     this.clearTint();
+  }
+
+  private handleCombat(time: number): void {
+    if (this.controls.fire) {
+      this.fire(time);
+    }
+    
+    if (this.controls.switchWeapon) {
+      this.switchWeapon();
+    }
+  }
+
+  private fire(time: number): void {
+    const weapon = this.getActiveWeapon();
+    if (!weapon || !weapon.canFire(time)) return;
+
+    if (weapon.config.id === 'knife') {
+      this.meleeAttack();
+    } else {
+      this.fireProjectile(weapon, time);
+    }
+  }
+
+  private meleeAttack(): void {
+    if (!this.meleeWeapon.canFire(Date.now())) return;
+    
+    this.meleeWeapon.fire(Date.now());
+    
+    // Create melee attack area
+    const attackRange = this.meleeWeapon.config.range!;
+    const attackX = this.playerState.facing === 'right' ? this.x + attackRange/2 : this.x - attackRange/2;
+    const attackY = this.y;
+    
+    // Emit melee attack event
+    this.scene.game.events.emit('meleeAttack', {
+      x: attackX,
+      y: attackY,
+      width: attackRange,
+      height: 40,
+      damage: this.meleeWeapon.state.damage,
+      playerId: this.playerState.id,
+    });
+    
+    // Visual effect
+    const flash = this.scene.add.graphics();
+    flash.fillStyle(0xffffff, 0.8);
+    flash.fillRect(attackX - attackRange/2, attackY - 20, attackRange, 40);
+    this.scene.time.delayedCall(50, () => flash.destroy());
+  }
+
+  private fireProjectile(weapon: Weapon, time: number): void {
+    if (!weapon.fire(time)) return;
+
+    const aimX = this.controls.aim.x - this.x;
+    const aimY = this.controls.aim.y - this.y;
+    const aimLength = Math.sqrt(aimX * aimX + aimY * aimY);
+    
+    if (aimLength === 0) return;
+    
+    const normalizedX = aimX / aimLength;
+    const normalizedY = aimY / aimLength;
+    
+    const projectileCount = weapon.config.projectileCount || 1;
+    const spread = weapon.config.spread || 0;
+    
+    for (let i = 0; i < projectileCount; i++) {
+      let angleOffset = 0;
+      if (projectileCount > 1) {
+        angleOffset = (i - (projectileCount - 1) / 2) * (spread / projectileCount) * (Math.PI / 180);
+      }
+      
+      const cos = Math.cos(angleOffset);
+      const sin = Math.sin(angleOffset);
+      const finalX = normalizedX * cos - normalizedY * sin;
+      const finalY = normalizedX * sin + normalizedY * cos;
+      
+      const velocityX = finalX * weapon.config.projectileSpeed;
+      const velocityY = finalY * weapon.config.projectileSpeed;
+      
+      const projectileState = {
+        id: `${this.playerState.id}_${time}_${i}`,
+        x: this.x,
+        y: this.y,
+        velocityX,
+        velocityY,
+        damage: weapon.state.damage,
+        playerId: this.playerState.id,
+        weaponType: weapon.config.id,
+        bounces: weapon.config.bounces,
+        explosive: weapon.config.explosive,
+        explosionRadius: weapon.config.explosionRadius,
+      };
+      
+      const projectile = new Projectile(
+        this.scene,
+        this.x,
+        this.y,
+        velocityX,
+        velocityY,
+        projectileState
+      );
+      
+      // Add to projectiles group for collision detection
+      this.scene.game.events.emit('projectileCreated', projectile);
+    }
+    
+    // Remove weapon if empty
+    if (weapon.isEmpty() && weapon.config.id !== 'knife') {
+      this.removeWeapon(this.activeWeaponIndex);
+    }
+    
+    this.updateWeaponStates();
+  }
+
+  private switchWeapon(): void {
+    if (this.weapons.length === 0) return;
+    
+    this.activeWeaponIndex = (this.activeWeaponIndex + 1) % this.weapons.length;
+    this.playerState.activeWeapon = this.activeWeaponIndex;
+  }
+
+  private getActiveWeapon(): Weapon | null {
+    if (this.activeWeaponIndex >= 0 && this.activeWeaponIndex < this.weapons.length) {
+      return this.weapons[this.activeWeaponIndex];
+    }
+    return this.meleeWeapon; // Default to knife
+  }
+
+  public addWeapon(weaponId: string): boolean {
+    if (this.weapons.length >= 2) return false; // Max 2 weapons + knife
+    
+    const weapon = new Weapon(weaponId);
+    this.weapons.push(weapon);
+    
+    if (this.activeWeaponIndex === -1) {
+      this.activeWeaponIndex = 0;
+      this.playerState.activeWeapon = 0;
+    }
+    
+    this.updateWeaponStates();
+    return true;
+  }
+
+  private removeWeapon(index: number): void {
+    if (index < 0 || index >= this.weapons.length) return;
+    
+    this.weapons.splice(index, 1);
+    
+    if (this.activeWeaponIndex >= this.weapons.length) {
+      this.activeWeaponIndex = this.weapons.length - 1;
+    }
+    
+    if (this.weapons.length === 0) {
+      this.activeWeaponIndex = -1;
+    }
+    
+    this.playerState.activeWeapon = this.activeWeaponIndex;
+    this.updateWeaponStates();
+  }
+
+  private updateWeaponStates(): void {
+    this.playerState.weapons = this.weapons.map(w => w.state);
   }
 
   public addKill(): void {
