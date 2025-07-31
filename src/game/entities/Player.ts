@@ -124,13 +124,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // Dashing
     if (this.controls.dash && this.dashCooldownTimer <= 0) {
-      const dashForce = 300;
+      const dashForce = 400;
       if (this.controls.left) {
         velocityX = -dashForce;
       } else if (this.controls.right) {
         velocityX = dashForce;
+      } else {
+        // Dash in facing direction if no direction pressed
+        velocityX = this.playerState.facing === 'right' ? dashForce : -dashForce;
       }
       this.dashCooldownTimer = 1000; // 1 second cooldown
+      
+      // Apply dash impulse immediately
+      body.setVelocityX(velocityX);
+      return; // Skip normal velocity setting for this frame
     }
 
     this.setVelocity(velocityX, velocityY);
