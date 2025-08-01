@@ -2,17 +2,23 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Projectile } from '../entities/Projectile';
 import { WeaponSpawn } from '../entities/WeaponSpawn';
+import { AIBot } from '../entities/AIBot';
+import { DestructibleTerrain } from '../entities/DestructibleTerrain';
+import { NetworkManager } from '../multiplayer/NetworkManager';
 import { GameControls } from '../../types/game';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
+  private aiBots!: AIBot[];
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasdKeys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private shiftKey!: Phaser.Input.Keyboard.Key;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
+  private destructibleTerrain!: DestructibleTerrain[];
   private projectiles!: Phaser.Physics.Arcade.Group;
   private weaponSpawns!: WeaponSpawn[];
+  private networkManager!: NetworkManager;
   private gameTime: number = 300; // 5 minutes in seconds
   private gameTimer!: Phaser.Time.TimerEvent;
 
@@ -36,20 +42,30 @@ export class GameScene extends Phaser.Scene {
     // Create background
     this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
     
-    // Create platforms
+    // Create platforms (indestructible)
     this.platforms = this.physics.add.staticGroup();
     
-    // Ground
+    // Ground (indestructible)
     this.platforms.create(width / 2, height - 16, 'ground').setScale(width / 64, 1).refreshBody();
     
-    // Some platforms
-    this.platforms.create(200, height - 200, 'ground').setScale(3, 1).refreshBody();
-    this.platforms.create(600, height - 300, 'ground').setScale(4, 1).refreshBody();
-    this.platforms.create(1000, height - 250, 'ground').setScale(3, 1).refreshBody();
-    this.platforms.create(400, height - 400, 'ground').setScale(2, 1).refreshBody();
+    // Create destructible terrain
+    this.destructibleTerrain = [];
+    this.destructibleTerrain.push(new DestructibleTerrain(this, 150, height - 232, 160, 64)); // Platform 1
+    this.destructibleTerrain.push(new DestructibleTerrain(this, 550, height - 332, 200, 64)); // Platform 2  
+    this.destructibleTerrain.push(new DestructibleTerrain(this, 950, height - 282, 160, 64)); // Platform 3
+    this.destructibleTerrain.push(new DestructibleTerrain(this, 350, height - 432, 100, 64)); // Platform 4
     
     // Create player
     this.player = new Player(this, 100, height - 100, 'player1');
+    
+    // Create AI bots
+    this.aiBots = [];
+    this.aiBots.push(new AIBot(this, 300, height - 100, 'bot1'));
+    this.aiBots.push(new AIBot(this, 800, height - 100, 'bot2'));
+    
+    // Initialize network manager
+    this.networkManager = new NetworkManager();
+    this.networkManager.initialize();
     
     // Create projectiles group
     this.projectiles = this.physics.add.group();
@@ -61,6 +77,13 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.projectiles, this.platforms, this.handleProjectileHit, undefined, this);
     this.physics.add.overlap(this.player, this.projectiles, this.handlePlayerHit, undefined, this);
+    
+    // Set up AI bot collisions
+    this.aiBots.forEach(bot => {
+      this.physics.add.collider(bot, this.platforms);
+      this.physics.add.overlap(bot, this.projectiles, this.handlePlayerHit, undefined, this);
+      this.physics.add.overlap(this.player, bot, this.handlePlayerCollision, undefined, this);
+    });
     
     // Set up weapon pickup collisions
     this.weaponSpawns.forEach(spawn => {
@@ -83,6 +106,9 @@ export class GameScene extends Phaser.Scene {
     
     // Set up combat events
     this.setupCombatEvents();
+    
+    // Set up terrain destruction events
+    this.setupTerrainEvents();
   }
 
   private setupControls(): void {
@@ -185,7 +211,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.game.events.on('explosion', (explosion: any) => {
-      // Handle explosion damage (simplified for MVP)
+      // Handle explosion damage to player
       const distance = Phaser.Math.Distance.Between(
         this.player.x, this.player.y,
         explosion.x, explosion.y
@@ -195,6 +221,19 @@ export class GameScene extends Phaser.Scene {
         const damage = Math.max(0, explosion.damage * (1 - distance / explosion.radius));
         this.player.takeDamage(damage);
       }
+      
+      // Handle explosion damage to AI bots
+      this.aiBots.forEach(bot => {
+        const botDistance = Phaser.Math.Distance.Between(
+          bot.x, bot.y,
+          explosion.x, explosion.y
+        );
+        
+        if (botDistance <= explosion.radius && explosion.playerId !== bot.playerState.id) {
+          const damage = Math.max(0, explosion.damage * (1 - botDistance / explosion.radius));
+          bot.takeDamage(damage);
+        }
+      });
     });
   }
 
@@ -205,9 +244,37 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handlePlayerHit(player: any, projectile: any): void {
-    if (projectile instanceof Projectile && projectile.projectileState.playerId !== this.player.playerState.id) {
-      this.player.takeDamage(projectile.projectileState.damage);
-      projectile.hit();
+    if (projectile instanceof Projectile) {
+      // Check if it's the main player or a bot
+      if (player === this.player && projectile.projectileState.playerId !== this.player.playerState.id) {
+        this.player.takeDamage(projectile.projectileState.damage);
+        projectile.hit();
+      } else if (player instanceof AIBot && projectile.projectileState.playerId !== player.playerState.id) {
+        player.takeDamage(projectile.projectileState.damage);
+        projectile.hit();
+        
+        // If player killed the bot, increment kill count
+        if (!player.playerState.isAlive && projectile.projectileState.playerId === this.player.playerState.id) {
+          this.player.playerState.kills++;
+        }
+      }
+    }
+  }
+  
+  private handlePlayerCollision(player1: any, player2: any): void {
+    // Simple collision response - just separate the players
+    const dx = player1.x - player2.x;
+    const dy = player1.y - player2.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < 40) { // Minimum separation distance
+      const separation = (40 - distance) / 2;
+      const angle = Math.atan2(dy, dx);
+      
+      player1.x += Math.cos(angle) * separation;
+      player1.y += Math.sin(angle) * separation;
+      player2.x -= Math.cos(angle) * separation;
+      player2.y -= Math.sin(angle) * separation;
     }
   }
 
@@ -251,6 +318,13 @@ export class GameScene extends Phaser.Scene {
     this.player.updateControls(controls);
     this.player.update(time, delta);
     
+    // Update AI bots
+    this.aiBots.forEach(bot => bot.update(time, delta));
+    
+    // Update network manager and process messages
+    const networkMessages = this.networkManager.update(time);
+    this.processNetworkMessages(networkMessages);
+    
     // Update weapon spawns
     this.weaponSpawns.forEach(spawn => spawn.update(time, delta));
     
@@ -258,6 +332,68 @@ export class GameScene extends Phaser.Scene {
     this.projectiles.children.entries.forEach(projectile => {
       if (projectile instanceof Projectile) {
         projectile.update(time, delta);
+      }
+    });
+  }
+  
+  private setupTerrainEvents(): void {
+    this.events.on('terrainExplosion', (explosion: any) => {
+      this.destructibleTerrain.forEach(terrain => {
+        terrain.destroyArea(explosion.x, explosion.y, explosion.radius, explosion.damage);
+      });
+    });
+  }
+  
+  private processNetworkMessages(messages: any[]): void {
+    messages.forEach(message => {
+      switch (message.type) {
+        case 'projectileCreate':
+          // Create projectile from network data
+          const projectileData = message.data;
+          const networkProjectile = new Projectile(
+            this, 
+            projectileData.position.x, 
+            projectileData.position.y,
+            projectileData.velocity.x,
+            projectileData.velocity.y,
+            {
+              id: projectileData.id,
+              x: projectileData.position.x,
+              y: projectileData.position.y,
+              velocityX: projectileData.velocity.x,
+              velocityY: projectileData.velocity.y,
+              damage: projectileData.damage,
+              playerId: projectileData.playerId,
+              weaponType: projectileData.weaponType,
+              bounces: 0,
+              explosive: projectileData.weaponType === 'rocket' || projectileData.weaponType === 'grenade',
+              explosionRadius: projectileData.weaponType === 'rocket' ? 100 : 50
+            }
+          );
+          this.projectiles.add(networkProjectile);
+          break;
+          
+        case 'playerUpdate':
+          // Update AI bot positions (in a real multiplayer game, this would be other players)
+          const playerData = message.data;
+          const bot = this.aiBots.find(b => b.playerState.id === playerData.playerId);
+          if (bot) {
+            // Interpolate position for smooth movement
+            this.tweens.add({
+              targets: bot,
+              x: playerData.position.x,
+              y: playerData.position.y,
+              duration: 100,
+              ease: 'Linear'
+            });
+          }
+          break;
+          
+        case 'terrainDestroy':
+          // Handle terrain destruction from network
+          const terrainData = message.data;
+          this.events.emit('terrainExplosion', terrainData);
+          break;
       }
     });
   }

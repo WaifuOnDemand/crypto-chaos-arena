@@ -6,7 +6,7 @@ import { Projectile } from './Projectile';
 export class Player extends Phaser.Physics.Arcade.Sprite {
   public playerState: PlayerState;
   private controls: GameControls;
-  private dashCooldownTimer: number = 0;
+  protected dashCooldownTimer: number = 0;
   private jumpCount: number = 0;
   private maxJumps: number = 2;
   private weapons: Weapon[] = [];

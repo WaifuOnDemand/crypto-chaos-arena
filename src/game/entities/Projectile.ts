@@ -146,6 +146,23 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
 
   public hit(): void {
     if (this.projectileState.explosive) {
+      // Create explosion effect
+      this.scene.game.events.emit('explosion', {
+        x: this.x,
+        y: this.y,
+        radius: this.projectileState.explosionRadius || 100,
+        damage: this.projectileState.damage,
+        playerId: this.projectileState.playerId
+      });
+      
+      // Destroy terrain in explosion radius
+      this.scene.events.emit('terrainExplosion', {
+        x: this.x,
+        y: this.y,
+        radius: this.projectileState.explosionRadius || 100,
+        damage: this.projectileState.damage * 2 // More damage to terrain
+      });
+      
       this.explode();
     } else {
       this.destroy();
