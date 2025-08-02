@@ -151,4 +151,27 @@ export class DestructibleTerrain extends Phaser.GameObjects.Container {
     
     return false;
   }
+  
+  public setChunkHealth(x: number, y: number, health: number): void {
+    const chunkX = Math.floor(x / this.chunkSize);
+    const chunkY = Math.floor(y / this.chunkSize);
+    
+    if (chunkX >= 0 && chunkX < this.chunks.length && 
+        chunkY >= 0 && chunkY < this.chunks[0].length) {
+      this.chunks[chunkX][chunkY].health = health;
+      this.chunks[chunkX][chunkY].maxHealth = health;
+    }
+  }
+  
+  public getChunkHealth(x: number, y: number): number {
+    const chunkX = Math.floor(x / this.chunkSize);
+    const chunkY = Math.floor(y / this.chunkSize);
+    
+    if (chunkX >= 0 && chunkX < this.chunks.length && 
+        chunkY >= 0 && chunkY < this.chunks[0].length) {
+      return this.chunks[chunkX][chunkY].health;
+    }
+    
+    return 0;
+  }
 }
