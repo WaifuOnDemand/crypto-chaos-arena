@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
+import { SolanaWalletProvider } from "./components/wallet/WalletProvider";
+import { WalletButton } from "./components/wallet/WalletButton";
 import Index from "./pages/Index";
 import { GameLobby } from "./pages/GameLobby";
 import { PlayerStatistics } from "./pages/PlayerStatistics";
@@ -17,23 +19,25 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <SidebarProvider>
-          <div className="min-h-screen flex w-full bg-background">
-            <AppSidebar />
-            
-            <div className="flex-1 flex flex-col">
-              <header className="h-14 flex items-center border-b bg-background/95 backdrop-blur-sm px-4">
-                <SidebarTrigger className="mr-4" />
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gradient-to-br from-primary to-primary/60 rounded-md flex items-center justify-center">
-                    <span className="text-primary-foreground font-bold text-xs">CC</span>
+      <SolanaWalletProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <SidebarProvider>
+            <div className="min-h-screen flex w-full bg-background">
+              <AppSidebar />
+              
+              <div className="flex-1 flex flex-col">
+                <header className="h-14 flex items-center justify-between border-b bg-background/95 backdrop-blur-sm px-4">
+                  <div className="flex items-center gap-2">
+                    <SidebarTrigger className="mr-4" />
+                    <div className="w-6 h-6 bg-gradient-to-br from-primary to-primary/60 rounded-md flex items-center justify-center">
+                      <span className="text-primary-foreground font-bold text-xs">CC</span>
+                    </div>
+                    <span className="font-semibold">Crypto Chaos</span>
                   </div>
-                  <span className="font-semibold">Crypto Chaos</span>
-                </div>
-              </header>
+                  <WalletButton />
+                </header>
               
               <main className="flex-1 p-6 overflow-auto">
                 <Routes>
@@ -49,6 +53,7 @@ const App = () => (
           </div>
         </SidebarProvider>
       </BrowserRouter>
+      </SolanaWalletProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
