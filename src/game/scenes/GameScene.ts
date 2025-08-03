@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { Projectile } from '../entities/Projectile';
 import { WeaponSpawn } from '../entities/WeaponSpawn';
+import { HealthPack } from '../entities/HealthPack';
 import { AIBot } from '../entities/AIBot';
 import { DestructibleTerrain } from '../entities/DestructibleTerrain';
 import { NetworkManager } from '../multiplayer/NetworkManager';
@@ -18,6 +19,7 @@ export class GameScene extends Phaser.Scene {
   private destructibleTerrain!: DestructibleTerrain[];
   private projectiles!: Phaser.Physics.Arcade.Group;
   private weaponSpawns!: WeaponSpawn[];
+  private healthPacks!: HealthPack[];
   private networkManager!: NetworkManager;
   private gameTime: number = 300; // 5 minutes in seconds
   private gameTimer!: Phaser.Time.TimerEvent;
@@ -73,6 +75,9 @@ export class GameScene extends Phaser.Scene {
     // Create weapon spawns
     this.createWeaponSpawns();
     
+    // Create health packs
+    this.createHealthPacks();
+    
     // Set up collisions
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.projectiles, this.platforms, this.handleProjectileHit, undefined, this);
@@ -88,6 +93,11 @@ export class GameScene extends Phaser.Scene {
     // Set up weapon pickup collisions
     this.weaponSpawns.forEach(spawn => {
       this.physics.add.overlap(this.player, spawn, this.handleWeaponPickup, undefined, this);
+    });
+    
+    // Set up health pack pickup collisions
+    this.healthPacks.forEach(pack => {
+      this.physics.add.overlap(this.player, pack, this.handleHealthPackPickup, undefined, this);
     });
     
     // Set up controls
@@ -200,6 +210,27 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private createHealthPacks(): void {
+    const { width, height } = this.cameras.main;
+    this.healthPacks = [
+      new HealthPack(this, 150, height - 300, 50),
+      new HealthPack(this, 600, height - 200, 75),
+      new HealthPack(this, 900, height - 400, 50),
+      new HealthPack(this, 1200, height - 150, 100),
+    ];
+    
+    // Add debug keys for testing status effects
+    this.input.keyboard!.addKey('1').on('down', () => {
+      this.player.addStatusEffect('poisoned', 10000, 8); // 10 seconds, 8 damage per tick
+    });
+    this.input.keyboard!.addKey('2').on('down', () => {
+      this.player.addStatusEffect('burned', 5000, 5); // 5 seconds, 5 damage per tick
+    });
+    this.input.keyboard!.addKey('3').on('down', () => {
+      this.player.addStatusEffect('frozen', 8000, 1); // 8 seconds, slows movement
+    });
+  }
+
   private setupCombatEvents(): void {
     this.game.events.on('projectileCreated', (projectile: Projectile) => {
       this.projectiles.add(projectile);
@@ -300,6 +331,28 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private handleHealthPackPickup(player: any, pack: any): void {
+    if (pack instanceof HealthPack && pack.isAvailable()) {
+      const healAmount = pack.pickup();
+      if (healAmount > 0 && this.player.heal(healAmount)) {
+        // Success feedback
+        const pickupText = this.add.text(pack.x, pack.y - 30, `+${healAmount} HP`, {
+          fontSize: '16px',
+          color: '#00ff00',
+          fontFamily: 'monospace',
+        }).setOrigin(0.5);
+        
+        this.tweens.add({
+          targets: pickupText,
+          y: pack.y - 60,
+          alpha: 0,
+          duration: 1000,
+          onComplete: () => pickupText.destroy(),
+        });
+      }
+    }
+  }
+
   update(time: number, delta: number): void {
     // Update controls
     const controls: Partial<GameControls> = {
@@ -327,6 +380,9 @@ export class GameScene extends Phaser.Scene {
     
     // Update weapon spawns
     this.weaponSpawns.forEach(spawn => spawn.update(time, delta));
+    
+    // Update health packs
+    this.healthPacks.forEach(pack => pack.update(time, delta));
     
     // Update projectiles
     this.projectiles.children.entries.forEach(projectile => {

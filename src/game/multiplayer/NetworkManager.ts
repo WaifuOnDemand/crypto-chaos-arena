@@ -68,7 +68,8 @@ export class NetworkManager {
       canJump: true,
       canDoubleJump: true,
       dashCooldown: 0,
-      facing: 'right'
+      facing: 'right',
+      statusEffects: []
     };
     
     this.connectedPlayers.set(botId, botState);

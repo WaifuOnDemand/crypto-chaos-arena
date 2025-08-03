@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { PlayerState, GameControls } from '../../types/game';
+import { PlayerState, GameControls, StatusEffect } from '../../types/game';
 import { Weapon } from './Weapon';
 import { Projectile } from './Projectile';
+import { StatusEffectsManager } from './StatusEffectsManager';
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
   public playerState: PlayerState;
@@ -12,6 +13,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private weapons: Weapon[] = [];
   private activeWeaponIndex: number = -1;
   private meleeWeapon: Weapon;
+  private statusEffectsManager: StatusEffectsManager;
+  private baseSpeed: number = 200;
 
   constructor(scene: Phaser.Scene, x: number, y: number, playerId: string) {
     super(scene, x, y, 'player');
@@ -34,10 +37,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       canDoubleJump: true,
       dashCooldown: 0,
       facing: 'right',
+      statusEffects: [],
     };
 
     // Initialize with knife
     this.meleeWeapon = new Weapon('knife');
+    
+    // Initialize status effects manager
+    this.statusEffectsManager = new StatusEffectsManager(scene);
 
     this.controls = {
       left: false,
@@ -80,6 +87,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   public update(time: number, delta: number): void {
+    this.updateStatusEffects(time, delta);
     this.updateMovement(delta);
     this.updateTimers(delta);
     this.updatePlayerState();
@@ -89,8 +97,26 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.scene.game.events.emit('playerUpdate', this.playerState);
   }
 
+  private updateStatusEffects(time: number, delta: number): void {
+    // Update status effects and apply damage from DOT effects
+    const statusModifiers = this.statusEffectsManager.updateEffects(time, delta, this);
+    
+    // Apply status effect damage
+    if (statusModifiers.damage > 0 && this.playerState.isAlive) {
+      this.takeDamage(statusModifiers.damage);
+    }
+    
+    // Update visual effect positions
+    this.statusEffectsManager.updateVisualEffectPositions(this.x, this.y);
+    
+    // Update player state with current status effects
+    this.playerState.statusEffects = this.statusEffectsManager.getActiveEffects();
+  }
+
   private updateMovement(delta: number): void {
-    const speed = 200;
+    // Get speed and jump modifiers from status effects
+    const statusModifiers = this.statusEffectsManager.updateEffects(Date.now(), delta, this);
+    const speed = this.baseSpeed * statusModifiers.speedModifier;
     let velocityX = 0;
     const body = this.body as Phaser.Physics.Arcade.Body;
     let velocityY = body.velocity.y;
@@ -106,13 +132,16 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.setFlipX(false);
     }
 
-    // Jumping
+    // Jumping (affected by status effects)
     if (this.controls.jump && this.jumpCount < this.maxJumps) {
+      const jumpForce = -400 * statusModifiers.jumpModifier;
+      const doubleJumpForce = -350 * statusModifiers.jumpModifier;
+      
       if (body.onFloor() || this.jumpCount === 0) {
-        velocityY = -400;
+        velocityY = jumpForce;
         this.jumpCount = body.onFloor() ? 1 : 2;
       } else if (this.jumpCount === 1) {
-        velocityY = -350; // Slightly weaker double jump
+        velocityY = doubleJumpForce;
         this.jumpCount = 2;
       }
     }
@@ -382,5 +411,64 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   public addKill(): void {
     this.playerState.kills++;
+  }
+
+  public heal(amount: number): boolean {
+    if (!this.playerState.isAlive || this.playerState.health >= this.playerState.maxHealth) {
+      return false;
+    }
+    
+    const oldHealth = this.playerState.health;
+    this.playerState.health = Math.min(this.playerState.maxHealth, this.playerState.health + amount);
+    const actualHealing = this.playerState.health - oldHealth;
+    
+    if (actualHealing > 0) {
+      // Healing visual effect
+      this.setTint(0x00ff00);
+      this.scene.time.delayedCall(200, () => {
+        this.clearTint();
+      });
+      
+      // Floating heal text
+      const healText = this.scene.add.text(this.x, this.y - 40, `+${Math.round(actualHealing)}`, {
+        fontSize: '16px',
+        color: '#00ff00',
+        fontFamily: 'monospace',
+      }).setOrigin(0.5);
+      
+      this.scene.tweens.add({
+        targets: healText,
+        y: healText.y - 30,
+        alpha: 0,
+        duration: 1000,
+        onComplete: () => healText.destroy(),
+      });
+      
+      return true;
+    }
+    
+    return false;
+  }
+
+  public addStatusEffect(type: StatusEffect['type'], duration: number, intensity: number): void {
+    this.statusEffectsManager.addStatusEffect(type, duration, intensity);
+  }
+
+  public removeStatusEffect(type: StatusEffect['type']): void {
+    this.statusEffectsManager.removeStatusEffect(type);
+  }
+
+  public hasStatusEffect(type: StatusEffect['type']): boolean {
+    return this.statusEffectsManager.hasEffect(type);
+  }
+
+  public clearAllStatusEffects(): void {
+    this.statusEffectsManager.clearAllEffects();
+    this.playerState.statusEffects = [];
+  }
+
+  public destroy(fromScene?: boolean): void {
+    this.statusEffectsManager.destroy();
+    super.destroy(fromScene);
   }
 }

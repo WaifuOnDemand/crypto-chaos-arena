@@ -34,6 +34,7 @@ export interface PlayerState {
   canDoubleJump: boolean;
   dashCooldown: number;
   facing: 'left' | 'right';
+  statusEffects: StatusEffect[];
 }
 
 export interface WeaponState {
@@ -78,6 +79,22 @@ export interface MapState {
   weaponSpawns: Array<{ x: number; y: number; weaponType?: string }>;
   healthPickups: Array<{ x: number; y: number; active: boolean }>;
   destructibleTiles: boolean[][];
+}
+
+export interface StatusEffect {
+  type: 'poisoned' | 'burned' | 'frozen';
+  duration: number;
+  intensity: number;
+  lastTick: number;
+}
+
+export interface HealthPickupState {
+  id: string;
+  x: number;
+  y: number;
+  healAmount: number;
+  active: boolean;
+  respawnTime: number;
 }
 
 export interface GameControls {
