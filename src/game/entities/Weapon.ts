@@ -13,6 +13,8 @@ export interface WeaponConfig {
   explosive?: boolean;
   explosionRadius?: number;
   bounces?: number;
+  bounceDecay?: number; // velocity multiplier per bounce (0-1)
+  explosionDelay?: number; // ms delay before explosion (for grenades)
   range?: number; // for knife
 }
 
@@ -69,6 +71,8 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     explosive: true,
     explosionRadius: 80,
     bounces: 3,
+    bounceDecay: 0.7, // Lose 30% velocity per bounce
+    explosionDelay: 3000, // 3 second fuse timer
   },
 };
 

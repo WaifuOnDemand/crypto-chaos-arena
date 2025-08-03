@@ -4,8 +4,10 @@ import { ProjectileState } from '../../types/game';
 export class Projectile extends Phaser.Physics.Arcade.Sprite {
   public projectileState: ProjectileState;
   private lifeTimer: number = 0;
-  private maxLifetime: number = 3000; // 3 seconds max lifetime
+  private maxLifetime: number = 5000; // 5 seconds max lifetime
   private bouncesRemaining: number;
+  private explosionTimer?: Phaser.Time.TimerEvent;
+  private isBeeping: boolean = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -18,6 +20,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     super(scene, x, y, 'projectile');
     
     this.projectileState = projectileState;
+    this.projectileState.timeAlive = 0;
     this.bouncesRemaining = projectileState.bounces || 0;
 
     // Add to scene
@@ -32,11 +35,15 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
       (this.body as Phaser.Physics.Arcade.Body).onWorldBounds = true;
       
       // Set gravity for projectiles
-      if (projectileState.weaponType !== 'grenade') {
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity completely
+      if (projectileState.weaponType === 'grenade') {
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-400); // Normal gravity for grenades
+        (this.body as Phaser.Physics.Arcade.Body).setBounce(0.6, 0.6); // Built-in bounce for grenades
+      } else if (projectileState.weaponType === 'rocket') {
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity for rockets
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
       } else {
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-600); // Reduced gravity for grenades
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity for bullets
+        (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
       }
     }
 
@@ -46,6 +53,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     // Set up world bounds collision for bouncing projectiles
     if (this.bouncesRemaining > 0) {
       scene.physics.world.on('worldbounds', this.handleWorldBounce, this);
+    }
+    
+    // Set up explosion timer for grenades
+    if (projectileState.weaponType === 'grenade' && projectileState.explosionDelay) {
+      this.startGrenadeTimer();
     }
   }
 
@@ -76,25 +88,74 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     graphics.destroy();
   }
 
+  private startGrenadeTimer(): void {
+    if (!this.projectileState.explosionDelay) return;
+    
+    // Start explosion timer
+    this.explosionTimer = this.scene.time.delayedCall(this.projectileState.explosionDelay, () => {
+      this.explode();
+    });
+    
+    // Start beeping sound/visual at 1 second remaining
+    const beepStartTime = Math.max(0, this.projectileState.explosionDelay - 1000);
+    this.scene.time.delayedCall(beepStartTime, () => {
+      this.startBeeping();
+    });
+  }
+  
+  private startBeeping(): void {
+    this.isBeeping = true;
+    
+    // Create rapid blinking effect for last second
+    this.scene.tweens.add({
+      targets: this,
+      alpha: 0.3,
+      duration: 200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Power2'
+    });
+    
+    // Add red tint for danger
+    this.setTint(0xff0000);
+  }
+
   private handleWorldBounce(event: any, body: Phaser.Physics.Arcade.Body): void {
     if (body === this.body && this.bouncesRemaining > 0) {
       this.bouncesRemaining--;
       
-      // Add some randomness to bounces
+      // Apply bounce decay
+      const decay = this.projectileState.bounceDecay || 0.8;
       const currentVel = this.body!.velocity;
+      
+      // Add some randomness to bounces and apply decay
       this.setVelocity(
-        currentVel.x * 0.8 + (Math.random() - 0.5) * 50,
-        currentVel.y * 0.8 + (Math.random() - 0.5) * 50
+        currentVel.x * decay + (Math.random() - 0.5) * 30,
+        Math.abs(currentVel.y) * decay + (Math.random() - 0.5) * 30 // Ensure upward bounce
       );
       
-      if (this.bouncesRemaining <= 0) {
-        this.explode();
+      // Create bounce particles
+      this.scene.add.particles(this.x, this.y, 'grenade_projectile', {
+        scale: { start: 0.2, end: 0 },
+        speed: { min: 20, max: 60 },
+        lifespan: 400,
+        quantity: 3,
+        tint: 0x888888,
+      });
+      
+      // If no more bounces and it's a grenade, it stays on ground until timer expires
+      if (this.bouncesRemaining <= 0 && this.projectileState.weaponType === 'grenade') {
+        // Make it stop moving horizontally but can still roll slightly
+        const body = this.body as Phaser.Physics.Arcade.Body;
+        body.setVelocityX(body.velocity.x * 0.1);
+        body.setDrag(100, 0); // Add friction
       }
     }
   }
 
   public update(time: number, delta: number): void {
     this.lifeTimer += delta;
+    this.projectileState.timeAlive = this.lifeTimer;
     
     // Update projectile state
     const body = this.body as Phaser.Physics.Arcade.Body;
@@ -103,15 +164,22 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     this.projectileState.velocityX = body.velocity.x;
     this.projectileState.velocityY = body.velocity.y;
 
-    // Check lifetime
+    // Check lifetime (but don't auto-explode grenades with timers)
     if (this.lifeTimer >= this.maxLifetime) {
-      this.explode();
-      return;
+      if (this.projectileState.weaponType !== 'grenade' || !this.projectileState.explosionDelay) {
+        this.explode();
+        return;
+      }
     }
 
     // Rotate rockets to face direction of travel
     if (this.projectileState.weaponType === 'rocket') {
       this.rotation = Math.atan2(body.velocity.y, body.velocity.x);
+    }
+    
+    // Slight rotation for grenades when moving
+    if (this.projectileState.weaponType === 'grenade' && !this.isBeeping) {
+      this.rotation += delta * 0.005 * Math.abs(body.velocity.x + body.velocity.y) * 0.01;
     }
   }
 
@@ -145,6 +213,12 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   }
 
   public hit(): void {
+    // Grenades don't explode on impact - they use their timer
+    if (this.projectileState.weaponType === 'grenade' && this.projectileState.explosionDelay) {
+      // Just bounce or roll, don't explode
+      return;
+    }
+    
     if (this.projectileState.explosive) {
       // Create explosion effect
       this.scene.game.events.emit('explosion', {
@@ -167,5 +241,14 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.destroy();
     }
+  }
+
+  public destroy(fromScene?: boolean): void {
+    // Clean up timer if it exists
+    if (this.explosionTimer) {
+      this.explosionTimer.destroy();
+    }
+    
+    super.destroy(fromScene);
   }
 }

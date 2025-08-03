@@ -30,8 +30,9 @@ export const GameCanvas = () => {
         }}
       />
       <div className="text-center text-muted-foreground font-mono text-sm">
-        <p>🎮 WASD/Arrows: Move | Space: Jump | Shift: Dash | Mouse: Aim</p>
-        <p>💀 Phase 1: Basic movement and physics are ready!</p>
+        <p>🎮 WASD/Arrows: Move | Space: Jump | Shift: Dash | Mouse: Aim & Fire | Q: Switch Weapon</p>
+        <p>🗝️ Debug: 1-Poison | 2-Burn | 3-Freeze | F1-Physics Debug</p>
+        <p>💥 Grenades bounce 3 times and explode after 3 seconds with red blinking warning!</p>
       </div>
     </div>
   );

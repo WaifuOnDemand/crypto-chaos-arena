@@ -334,8 +334,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         playerId: this.playerState.id,
         weaponType: weapon.config.id,
         bounces: weapon.config.bounces,
+        bounceDecay: weapon.config.bounceDecay,
         explosive: weapon.config.explosive,
         explosionRadius: weapon.config.explosionRadius,
+        explosionDelay: weapon.config.explosionDelay,
+        timeAlive: 0,
       };
       
       const projectile = new Projectile(

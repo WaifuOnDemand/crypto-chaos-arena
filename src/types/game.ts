@@ -58,8 +58,11 @@ export interface ProjectileState {
   playerId: string;
   weaponType: string;
   bounces?: number;
+  bounceDecay?: number;
   explosive?: boolean;
   explosionRadius?: number;
+  explosionDelay?: number;
+  timeAlive?: number;
 }
 
 export interface GameState {
