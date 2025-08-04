@@ -35,6 +35,11 @@ export interface PlayerState {
   dashCooldown: number;
   facing: 'left' | 'right';
   statusEffects: StatusEffect[];
+  team?: 'red' | 'blue';
+  score: number;
+  hasFlag?: boolean;
+  respawnTime?: number;
+  inSafeZone?: boolean;
 }
 
 export interface WeaponState {
@@ -68,10 +73,57 @@ export interface ProjectileState {
 export interface GameState {
   players: Record<string, PlayerState>;
   projectiles: Record<string, ProjectileState>;
-  gameMode: 'deathmatch' | 'team-deathmatch' | 'last-man-standing';
+  gameMode: GameModeType;
   timeRemaining: number;
   isGameActive: boolean;
   map: MapState;
+  gameModeState: GameModeState;
+}
+
+export type GameModeType = 'deathmatch' | 'team-deathmatch' | 'last-man-standing' | 'battle-royale' | 'king-of-hill' | 'capture-flag';
+
+export interface GameModeState {
+  // Battle Royale
+  shrinkZone?: {
+    centerX: number;
+    centerY: number;
+    currentRadius: number;
+    targetRadius: number;
+    damage: number;
+    shrinkSpeed: number;
+    lastShrink: number;
+    phase: number;
+  };
+  
+  // Team modes
+  teams?: {
+    red: string[];
+    blue: string[];
+  };
+  teamScores?: {
+    red: number;
+    blue: number;
+  };
+  
+  // King of the Hill
+  controlPoint?: {
+    x: number;
+    y: number;
+    radius: number;
+    controllingTeam?: 'red' | 'blue' | null;
+    controlTime: number;
+    requiredTime: number;
+  };
+  
+  // Capture the Flag
+  flags?: {
+    red: { x: number; y: number; carriedBy?: string; atBase: boolean };
+    blue: { x: number; y: number; carriedBy?: string; atBase: boolean };
+  };
+  
+  // General
+  scoreLimit: number;
+  playersAlive: number;
 }
 
 export interface MapState {

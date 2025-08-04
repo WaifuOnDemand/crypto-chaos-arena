@@ -6,7 +6,8 @@ import { HealthPack } from '../entities/HealthPack';
 import { AIBot } from '../entities/AIBot';
 import { DestructibleTerrain } from '../entities/DestructibleTerrain';
 import { NetworkManager } from '../multiplayer/NetworkManager';
-import { GameControls } from '../../types/game';
+import { GameModeManager } from '../modes/GameModeManager';
+import { GameControls, GameModeType, GameModeState } from '../../types/game';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -21,8 +22,14 @@ export class GameScene extends Phaser.Scene {
   private weaponSpawns!: WeaponSpawn[];
   private healthPacks!: HealthPack[];
   private networkManager!: NetworkManager;
+  private gameModeManager!: GameModeManager;
   private gameTime: number = 300; // 5 minutes in seconds
   private gameTimer!: Phaser.Time.TimerEvent;
+  private currentGameMode: GameModeType = 'deathmatch';
+  private gameModeState!: GameModeState;
+  private shrinkZoneGraphics?: Phaser.GameObjects.Graphics;
+  private flagGraphics?: Phaser.GameObjects.Graphics;
+  private controlPointGraphics?: Phaser.GameObjects.Graphics;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -69,8 +76,19 @@ export class GameScene extends Phaser.Scene {
     this.networkManager = new NetworkManager();
     this.networkManager.initialize();
     
+    // Initialize game mode manager
+    this.gameModeManager = new GameModeManager(width, height);
+    
+    // Initialize current game mode (can be passed from lobby later)
+    this.currentGameMode = 'deathmatch'; // Default for now
+    const allPlayers = this.getAllPlayers();
+    this.gameModeState = this.gameModeManager.initializeGameMode(this.currentGameMode, allPlayers);
+    
     // Create projectiles group
     this.projectiles = this.physics.add.group();
+    
+    // Initialize game mode graphics
+    this.initializeGameModeGraphics();
     
     // Create weapon spawns
     this.createWeaponSpawns();
@@ -390,6 +408,9 @@ export class GameScene extends Phaser.Scene {
         projectile.update(time, delta);
       }
     });
+    
+    // Update game mode
+    this.updateGameMode(time, delta);
   }
   
   private setupTerrainEvents(): void {
@@ -452,5 +473,135 @@ export class GameScene extends Phaser.Scene {
           break;
       }
     });
+  }
+  
+  private getAllPlayers(): Record<string, any> {
+    const players: Record<string, any> = {};
+    players[this.player.playerState.id] = this.player.playerState;
+    
+    this.aiBots.forEach(bot => {
+      players[bot.playerState.id] = bot.playerState;
+    });
+    
+    return players;
+  }
+  
+  private initializeGameModeGraphics(): void {
+    // Initialize graphics for different game modes
+    this.shrinkZoneGraphics = this.add.graphics();
+    this.flagGraphics = this.add.graphics();
+    this.controlPointGraphics = this.add.graphics();
+  }
+  
+  private updateGameMode(time: number, delta: number): void {
+    const allPlayers = this.getAllPlayers();
+    const result = this.gameModeManager.updateGameMode(allPlayers, delta, time);
+    
+    this.gameModeState = result.gameState;
+    
+    // Handle game mode events
+    result.events.forEach(event => {
+      this.handleGameModeEvent(event);
+    });
+    
+    // Update visual elements based on game mode
+    this.updateGameModeVisuals();
+  }
+  
+  private handleGameModeEvent(event: { type: string; data: any }): void {
+    switch (event.type) {
+      case 'gameWin':
+        this.handleGameWin(event.data);
+        break;
+      case 'zonePhaseChange':
+        this.handleZonePhaseChange(event.data);
+        break;
+      case 'zoneDamage':
+        this.handleZoneDamage(event.data);
+        break;
+      case 'hillCaptured':
+        this.handleHillCaptured(event.data);
+        break;
+      case 'hillControlled':
+        this.handleHillControlled(event.data);
+        break;
+      case 'flagPickup':
+        this.handleFlagPickup(event.data);
+        break;
+      case 'flagScore':
+        this.handleFlagScore(event.data);
+        break;
+    }
+  }
+  
+  private handleGameWin(data: any): void {
+    console.log('Game won by:', data.winner, 'Mode:', data.gameMode);
+    this.endGame();
+  }
+  
+  private handleZonePhaseChange(data: any): void {
+    console.log('Zone entering phase:', data.phase, 'New radius:', data.newRadius);
+    // Add visual/audio feedback for zone changes
+  }
+  
+  private handleZoneDamage(data: any): void {
+    console.log('Zone damage to player:', data.playerId, 'Damage:', data.damage);
+    // Add screen effects for zone damage
+  }
+  
+  private handleHillCaptured(data: any): void {
+    console.log('Hill captured by team:', data.team);
+  }
+  
+  private handleHillControlled(data: any): void {
+    console.log('Hill controlled by team:', data.team, 'Score:', data.score);
+  }
+  
+  private handleFlagPickup(data: any): void {
+    console.log('Flag picked up by:', data.playerId, 'Team:', data.team);
+  }
+  
+  private handleFlagScore(data: any): void {
+    console.log('Flag scored by team:', data.team, 'Score:', data.score);
+  }
+  
+  private updateGameModeVisuals(): void {
+    // Clear previous graphics
+    this.shrinkZoneGraphics?.clear();
+    this.flagGraphics?.clear();
+    this.controlPointGraphics?.clear();
+    
+    // Battle Royale: Draw shrinking zone
+    if (this.currentGameMode === 'battle-royale' && this.gameModeState.shrinkZone) {
+      const zone = this.gameModeState.shrinkZone;
+      this.shrinkZoneGraphics?.lineStyle(4, 0xff0000, 0.8);
+      this.shrinkZoneGraphics?.strokeCircle(zone.centerX, zone.centerY, zone.currentRadius);
+      this.shrinkZoneGraphics?.lineStyle(2, 0xff6600, 0.6);
+      this.shrinkZoneGraphics?.strokeCircle(zone.centerX, zone.centerY, zone.targetRadius);
+    }
+    
+    // King of the Hill: Draw control point
+    if (this.currentGameMode === 'king-of-hill' && this.gameModeState.controlPoint) {
+      const point = this.gameModeState.controlPoint;
+      const color = point.controllingTeam === 'red' ? 0xff0000 : 
+                   point.controllingTeam === 'blue' ? 0x0000ff : 0x888888;
+      this.controlPointGraphics?.fillStyle(color, 0.3);
+      this.controlPointGraphics?.fillCircle(point.x, point.y, point.radius);
+      this.controlPointGraphics?.lineStyle(3, color, 0.8);
+      this.controlPointGraphics?.strokeCircle(point.x, point.y, point.radius);
+    }
+    
+    // Capture the Flag: Draw flags
+    if (this.currentGameMode === 'capture-flag' && this.gameModeState.flags) {
+      const { red, blue } = this.gameModeState.flags;
+      
+      // Red flag
+      this.flagGraphics?.fillStyle(0xff0000, red.atBase ? 1.0 : 0.5);
+      this.flagGraphics?.fillRect(red.x - 10, red.y - 20, 20, 30);
+      
+      // Blue flag  
+      this.flagGraphics?.fillStyle(0x0000ff, blue.atBase ? 1.0 : 0.5);
+      this.flagGraphics?.fillRect(blue.x - 10, blue.y - 20, 20, 30);
+    }
   }
 }

@@ -38,6 +38,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       dashCooldown: 0,
       facing: 'right',
       statusEffects: [],
+      score: 0,
     };
 
     // Initialize with knife

@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, Zap, Target } from 'lucide-react';
+import { Users, Clock, Zap, Target, Shield, Flag, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { GAME_MODE_CONFIGS } from '../game/modes/GameModeManager';
 
 interface GameMode {
   id: string;
@@ -15,35 +16,44 @@ interface GameMode {
   icon: React.ReactNode;
 }
 
-const gameModes: GameMode[] = [
-  {
-    id: 'deathmatch',
-    name: 'Deathmatch',
-    description: 'Classic free-for-all combat. Highest kill count wins!',
-    maxPlayers: 8,
-    duration: '5 minutes',
-    difficulty: 'Easy',
-    icon: <Target className="h-5 w-5" />
-  },
-  {
-    id: 'lastManStanding',
-    name: 'Last Man Standing',
-    description: 'Survive until the end. One life, winner takes all!',
-    maxPlayers: 6,
-    duration: '8 minutes',
-    difficulty: 'Hard',
-    icon: <Users className="h-5 w-5" />
-  },
-  {
-    id: 'blitzkrieg',
-    name: 'Blitzkrieg',
-    description: 'Fast-paced action with rapid weapon spawns and destruction!',
-    maxPlayers: 4,
-    duration: '3 minutes',
-    difficulty: 'Medium',
-    icon: <Zap className="h-5 w-5" />
+const getModeIcon = (modeId: string) => {
+  switch (modeId) {
+    case 'deathmatch': return <Target className="h-5 w-5" />;
+    case 'team-deathmatch': return <Users className="h-5 w-5" />;
+    case 'last-man-standing': return <Shield className="h-5 w-5" />;
+    case 'battle-royale': return <Zap className="h-5 w-5" />;
+    case 'king-of-hill': return <Crown className="h-5 w-5" />;
+    case 'capture-flag': return <Flag className="h-5 w-5" />;
+    default: return <Target className="h-5 w-5" />;
   }
-];
+};
+
+const getDifficultyFromMode = (modeId: string): 'Easy' | 'Medium' | 'Hard' => {
+  switch (modeId) {
+    case 'deathmatch': return 'Easy';
+    case 'team-deathmatch': return 'Medium';
+    case 'last-man-standing': return 'Hard';
+    case 'battle-royale': return 'Hard';
+    case 'king-of-hill': return 'Medium';
+    case 'capture-flag': return 'Medium';
+    default: return 'Easy';
+  }
+};
+
+const formatDuration = (seconds: number): string => {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+};
+
+const gameModes: GameMode[] = Object.values(GAME_MODE_CONFIGS).map(config => ({
+  id: config.id,
+  name: config.name,
+  description: config.description,
+  maxPlayers: config.maxPlayers,
+  duration: formatDuration(config.duration),
+  difficulty: getDifficultyFromMode(config.id),
+  icon: getModeIcon(config.id)
+}));
 
 const currentPlayers = [
   { id: '1', name: 'CryptoWarrior', rank: 'Gold', ping: 45 },
