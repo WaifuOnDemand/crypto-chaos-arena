@@ -134,6 +134,15 @@ export interface MapState {
   weaponSpawns: Array<{ x: number; y: number; weaponType?: string }>;
   healthPickups: Array<{ x: number; y: number; active: boolean }>;
   destructibleTiles: boolean[][];
+  environmentalHazards: Array<{
+    id: string;
+    type: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    active: boolean;
+  }>;
 }
 
 export interface StatusEffect {

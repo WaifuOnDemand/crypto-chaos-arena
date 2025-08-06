@@ -7,6 +7,7 @@ import { AIBot } from '../entities/AIBot';
 import { DestructibleTerrain } from '../entities/DestructibleTerrain';
 import { NetworkManager } from '../multiplayer/NetworkManager';
 import { GameModeManager } from '../modes/GameModeManager';
+import { EnvironmentalManager } from '../entities/EnvironmentalManager';
 import { GameControls, GameModeType, GameModeState } from '../../types/game';
 
 export class GameScene extends Phaser.Scene {
@@ -23,6 +24,7 @@ export class GameScene extends Phaser.Scene {
   private healthPacks!: HealthPack[];
   private networkManager!: NetworkManager;
   private gameModeManager!: GameModeManager;
+  private environmentalManager!: EnvironmentalManager;
   private gameTime: number = 300; // 5 minutes in seconds
   private gameTimer!: Phaser.Time.TimerEvent;
   private currentGameMode: GameModeType = 'deathmatch';
@@ -79,6 +81,10 @@ export class GameScene extends Phaser.Scene {
     // Initialize game mode manager
     this.gameModeManager = new GameModeManager(width, height);
     
+    // Initialize environmental manager
+    this.environmentalManager = new EnvironmentalManager(this);
+    this.environmentalManager.initialize(width, height);
+    
     // Initialize current game mode (can be passed from lobby later)
     this.currentGameMode = 'deathmatch'; // Default for now
     const allPlayers = this.getAllPlayers();
@@ -117,6 +123,9 @@ export class GameScene extends Phaser.Scene {
     this.healthPacks.forEach(pack => {
       this.physics.add.overlap(this.player, pack, this.handleHealthPackPickup, undefined, this);
     });
+    
+    // Set up environmental hazard collisions
+    this.environmentalManager.setupCollisions(this.player, this.aiBots, this.projectiles);
     
     // Set up controls
     this.setupControls();
@@ -408,6 +417,9 @@ export class GameScene extends Phaser.Scene {
         projectile.update(time, delta);
       }
     });
+    
+    // Update environmental hazards
+    this.environmentalManager.update(time, delta);
     
     // Update game mode
     this.updateGameMode(time, delta);
