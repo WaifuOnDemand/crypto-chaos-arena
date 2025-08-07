@@ -206,8 +206,12 @@ export class EnvironmentalManager {
         const projectileCollider = this.scene.physics.add.overlap(
           projectiles,
           hazard,
-          (projectile, hazard) => {
-            (hazard as EnvironmentalHazard).handleProjectileInteraction(projectile as Projectile);
+          (projectile, hazardSprite) => {
+            // Find the correct hazard instance by comparing the sprite
+            const actualHazard = this.hazards.find(h => h === hazardSprite);
+            if (actualHazard) {
+              actualHazard.handleProjectileInteraction(projectile as Projectile);
+            }
           }
         );
         this.projectileColliders.push(projectileCollider);
