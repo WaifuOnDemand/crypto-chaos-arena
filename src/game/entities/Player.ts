@@ -13,8 +13,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private weapons: Weapon[] = [];
   private activeWeaponIndex: number = -1;
   private meleeWeapon: Weapon;
+  private isDashing: boolean = false;
+  private dashTimeLeft: number = 0;
+  private dashDirectionX: number = 0;
+  private dashDirectionY: number = 0;
   private statusEffectsManager: StatusEffectsManager;
-  private baseSpeed: number = 200;
 
   constructor(scene: Phaser.Scene, x: number, y: number, playerId: string) {
     super(scene, x, y, 'player');
@@ -64,7 +67,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // Configure physics body
     if (this.body) {
       (this.body as Phaser.Physics.Arcade.Body).setSize(24, 40);
-      (this.body as Phaser.Physics.Arcade.Body).setOffset(4, 8);
+      (this.body as Phaser.Physics.Arcade.Body).setOffset(2, 2);
     }
     this.setCollideWorldBounds(true);
 
@@ -115,9 +118,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private updateMovement(delta: number): void {
-    // Get speed and jump modifiers from status effects
-    const statusModifiers = this.statusEffectsManager.updateEffects(Date.now(), delta, this);
-    const speed = this.baseSpeed * statusModifiers.speedModifier;
+    const speed = 200;
     let velocityX = 0;
     const body = this.body as Phaser.Physics.Arcade.Body;
     let velocityY = body.velocity.y;
@@ -133,16 +134,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.setFlipX(false);
     }
 
-    // Jumping (affected by status effects)
+    // Jumping
     if (this.controls.jump && this.jumpCount < this.maxJumps) {
-      const jumpForce = -400 * statusModifiers.jumpModifier;
-      const doubleJumpForce = -350 * statusModifiers.jumpModifier;
-      
       if (body.onFloor() || this.jumpCount === 0) {
-        velocityY = jumpForce;
+        velocityY = -400;
         this.jumpCount = body.onFloor() ? 1 : 2;
       } else if (this.jumpCount === 1) {
-        velocityY = doubleJumpForce;
+        velocityY = -350; // Slightly weaker double jump
         this.jumpCount = 2;
       }
     }
@@ -153,21 +151,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     // Dashing
-    if (this.controls.dash && this.dashCooldownTimer <= 0) {
-      const dashForce = 400;
-      if (this.controls.left) {
-        velocityX = -dashForce;
-      } else if (this.controls.right) {
-        velocityX = dashForce;
-      } else {
-        // Dash in facing direction if no direction pressed
-        velocityX = this.playerState.facing === 'right' ? dashForce : -dashForce;
+    if (!this.isDashing && this.controls.dash && this.dashCooldownTimer <= 0) {
+      const dashForce = 700; // Stronger dash
+      // Calculate direction to mouse
+      const dx = this.controls.aim.x - this.x;
+      const dy = this.controls.aim.y - this.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      let dirX = 1, dirY = 0;
+      if (length > 0) {
+        dirX = dx / length;
+        dirY = dy / length;
       }
+      this.isDashing = true;
+      this.dashTimeLeft = 200; // Dash lasts 200ms
+      this.dashDirectionX = dirX;
+      this.dashDirectionY = dirY;
       this.dashCooldownTimer = 1000; // 1 second cooldown
-      
-      // Apply dash impulse immediately
-      body.setVelocityX(velocityX);
-      return; // Skip normal velocity setting for this frame
+      // Set initial dash velocity
+      body.setVelocity(dashForce * dirX, dashForce * dirY);
+      return;
+    }
+
+    // Handle dash movement
+    if (this.isDashing) {
+      const dashForce = 700;
+      body.setVelocity(dashForce * this.dashDirectionX, dashForce * this.dashDirectionY);
+      this.dashTimeLeft -= delta;
+      if (this.dashTimeLeft <= 0) {
+        this.isDashing = false;
+        body.setVelocity(0, 0); // Stop all movement after dash
+      }
+      return; // Skip normal movement while dashing
     }
 
     this.setVelocity(velocityX, velocityY);
@@ -346,13 +360,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.scene,
         spawnX,
         spawnY,
-        velocityX,
-        velocityY,
         projectileState
       );
       
-      // Add to projectiles group for collision detection
-      this.scene.game.events.emit('projectileCreated', projectile);
+      // Add to projectiles group for collision detection and set velocity after
+      this.scene.game.events.emit('projectileCreated', { projectile, velocityX, velocityY });
     }
     
     // Remove weapon if empty

@@ -114,7 +114,7 @@ export class HealthPack extends Phaser.Physics.Arcade.Sprite {
     if (this.pulseTween) this.pulseTween.pause();
     
     // Pickup effect
-    this.scene.add.particles(this.x, this.y, 'healthpack', {
+    const emitter = this.scene.add.particles(this.x, this.y, 'healthpack', {
       scale: { start: 0.3, end: 0 },
       speed: { min: 50, max: 100 },
       lifespan: 500,
@@ -122,8 +122,18 @@ export class HealthPack extends Phaser.Physics.Arcade.Sprite {
       tint: 0x00ff00,
     });
     
+    // Destroy the emitter after 1 second
+    this.scene.time.addEvent({
+      delay: 1000,
+      callback: () => {
+        emitter.stop();
+        emitter.destroy();
+      },
+      callbackScope: this,
+    });
+    
     return this.pickupState.healAmount;
-  }
+}
 
   private respawn(): void {
     this.pickupState.active = true;

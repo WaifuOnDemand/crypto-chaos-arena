@@ -8,11 +8,10 @@ export class MenuScene extends Phaser.Scene {
   preload(): void {
     // Load menu assets here
     this.load.image('logo', 'data:image/svg+xml;base64,' + btoa(`
-      <svg width="300" height="100" xmlns="http://www.w3.org/2000/svg">
-        <rect width="300" height="100" fill="#1a1a2e"/>
-        <text x="150" y="40" font-family="monospace" font-size="24" fill="#ffd700" text-anchor="middle">CRYPTO</text>
-        <text x="150" y="70" font-family="monospace" font-size="24" fill="#00bfff" text-anchor="middle">CHAOS</text>
-        <text x="150" y="90" font-family="monospace" font-size="12" fill="#00ff00" text-anchor="middle">SHOOTER</text>
+      <svg width="500" height="150" xmlns="http://www.w3.org/2000/svg">
+        <rect width="500" height="150" fill="#1a1a2e"/>
+        <text x="250" y="50" font-family="fantasy" font-size="64" fill="#ffd700" text-anchor="middle">Chainbusters</text>
+        <text x="250" y="100" font-family="ui-rounded" font-size="32" fill="#ffd700" text-anchor="middle">Bustin' your chains</text>
       </svg>
     `));
   }
@@ -30,14 +29,14 @@ export class MenuScene extends Phaser.Scene {
     const startText = this.add.text(width / 2, height / 2 + 50, 'PRESS SPACE TO START', {
       fontSize: '24px',
       color: '#ffd700',
-      fontFamily: 'monospace',
+      fontFamily: 'ui-rounded',
     }).setOrigin(0.5);
 
     const instructionsText = this.add.text(width / 2, height / 2 + 100, 
       'WASD/ARROWS: Move | SPACE: Jump | SHIFT: Dash | MOUSE: Aim/Shoot', {
       fontSize: '16px',
       color: '#00bfff',
-      fontFamily: 'monospace',
+      fontFamily: 'ui-rounded',
     }).setOrigin(0.5);
 
     // Pulsing effect for start text

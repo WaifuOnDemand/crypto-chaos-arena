@@ -8,13 +8,13 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
   private bouncesRemaining: number;
   private explosionTimer?: Phaser.Time.TimerEvent;
   private isBeeping: boolean = false;
+  private initialVelocityX: number = 0;
+  private initialVelocityY: number = 0;
 
   constructor(
     scene: Phaser.Scene,
     x: number,
     y: number,
-    velocityX: number,
-    velocityY: number,
     projectileState: ProjectileState
   ) {
     super(scene, x, y, 'projectile');
@@ -27,8 +27,7 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     scene.add.existing(this);
     scene.physics.add.existing(this);
 
-    // Set up physics
-    this.setVelocity(velocityX, velocityY);
+    // Set up physics (velocity will be set later via setInitialVelocity)
     if (this.body) {
       (this.body as Phaser.Physics.Arcade.Body).setSize(4, 4);
       this.setCollideWorldBounds(true);
@@ -39,11 +38,15 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
         (this.body as Phaser.Physics.Arcade.Body).setGravityY(-400); // Normal gravity for grenades
         (this.body as Phaser.Physics.Arcade.Body).setBounce(0.6, 0.6); // Built-in bounce for grenades
       } else if (projectileState.weaponType === 'rocket') {
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity for rockets
+        // Rockets: Nearly constant velocity with minimal gravity influence
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-750); // Almost cancel gravity (800 - 50 = 50 gravity)
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
+        (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(800, 800); // Prevent excessive speeds
       } else {
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Cancel world gravity for bullets
+        // Bullets: Constant velocity with very minimal gravity influence  
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-780); // Almost cancel gravity (800 - 20 = 20 gravity)
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
+        (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(1000, 1000); // Allow high speeds for bullets
       }
     }
 
@@ -73,8 +76,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
         break;
       case 'grenade':
         graphics.fillStyle(0x4a90e2); // Blue grenade
-        graphics.fillCircle(3, 3, 3);
-        graphics.generateTexture('grenade_projectile', 6, 6);
+        graphics.fillCircle(6, 6, 6);
+        graphics.generateTexture('grenade_projectile', 8, 8);
         this.setTexture('grenade_projectile');
         break;
       default:
@@ -86,6 +89,10 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     }
     
     graphics.destroy();
+  }
+
+  public setInitialVelocity(velocityX: number, velocityY: number): void {
+    this.setVelocity(velocityX, velocityY);
   }
 
   private startGrenadeTimer(): void {

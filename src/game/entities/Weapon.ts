@@ -72,7 +72,7 @@ export const WEAPON_CONFIGS: Record<string, WeaponConfig> = {
     explosionRadius: 80,
     bounces: 3,
     bounceDecay: 0.7, // Lose 30% velocity per bounce
-    explosionDelay: 3000, // 3 second fuse timer
+    explosionDelay: 1500, // 3 second fuse timer
   },
 };
 

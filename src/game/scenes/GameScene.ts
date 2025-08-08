@@ -17,6 +17,7 @@ export class GameScene extends Phaser.Scene {
   private wasdKeys!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
   private spaceKey!: Phaser.Input.Keyboard.Key;
   private shiftKey!: Phaser.Input.Keyboard.Key;
+  private dashPressed: boolean = false;
   private platforms!: Phaser.Physics.Arcade.StaticGroup;
   private destructibleTerrain!: DestructibleTerrain[];
   private projectiles!: Phaser.Physics.Arcade.Group;
@@ -259,8 +260,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupCombatEvents(): void {
-    this.game.events.on('projectileCreated', (projectile: Projectile) => {
-      this.projectiles.add(projectile);
+    this.game.events.on('projectileCreated', (data: { projectile: Projectile, velocityX: number, velocityY: number }) => {
+      // Add projectile to group first
+      this.projectiles.add(data.projectile);
+      // Then set velocity after group addition
+      data.projectile.setInitialVelocity(data.velocityX, data.velocityY);
     });
 
     this.game.events.on('meleeAttack', (attack: any) => {
@@ -381,12 +385,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    // Update dash state tracking
+    if (Phaser.Input.Keyboard.JustDown(this.shiftKey)) {
+      this.dashPressed = true;
+    } else if (!this.shiftKey.isDown) {
+      this.dashPressed = false;
+    }
+    
     // Update controls
     const controls: Partial<GameControls> = {
       left: this.cursors.left.isDown || this.wasdKeys.A.isDown,
       right: this.cursors.right.isDown || this.wasdKeys.D.isDown,
       jump: Phaser.Input.Keyboard.JustDown(this.cursors.up) || Phaser.Input.Keyboard.JustDown(this.wasdKeys.W) || Phaser.Input.Keyboard.JustDown(this.spaceKey),
-      dash: Phaser.Input.Keyboard.JustDown(this.shiftKey),
+      dash: this.dashPressed,
       fire: this.input.activePointer.isDown,
       switchWeapon: Phaser.Input.Keyboard.JustDown(this.input.keyboard!.addKey('Q')),
       aim: {
@@ -443,8 +454,6 @@ export class GameScene extends Phaser.Scene {
             this, 
             projectileData.position.x, 
             projectileData.position.y,
-            projectileData.velocity.x,
-            projectileData.velocity.y,
             {
               id: projectileData.id,
               x: projectileData.position.x,
@@ -456,10 +465,12 @@ export class GameScene extends Phaser.Scene {
               weaponType: projectileData.weaponType,
               bounces: 0,
               explosive: projectileData.weaponType === 'rocket' || projectileData.weaponType === 'grenade',
-              explosionRadius: projectileData.weaponType === 'rocket' ? 100 : 50
+              explosionRadius: projectileData.weaponType === 'rocket' ? 100 : 50,
+              timeAlive: 0
             }
           );
           this.projectiles.add(networkProjectile);
+          networkProjectile.setInitialVelocity(projectileData.velocity.x, projectileData.velocity.y);
           break;
           
         case 'playerUpdate':
