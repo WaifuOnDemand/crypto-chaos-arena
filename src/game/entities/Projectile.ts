@@ -35,16 +35,16 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
       
       // Set gravity for projectiles
       if (projectileState.weaponType === 'grenade') {
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-400); // Normal gravity for grenades
-        (this.body as Phaser.Physics.Arcade.Body).setBounce(0.6, 0.6); // Built-in bounce for grenades
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(400); // Normal gravity for grenades
+        (this.body as Phaser.Physics.Arcade.Body).setBounce(0.8, 0.8); // Improved bounce for grenades
       } else if (projectileState.weaponType === 'rocket') {
-        // Rockets: Nearly constant velocity with minimal gravity influence
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-750); // Almost cancel gravity (800 - 50 = 50 gravity)
+        // Rockets: Completely unaffected by gravity
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Completely cancel world gravity
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
         (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(800, 800); // Prevent excessive speeds
       } else {
-        // Bullets: Constant velocity with very minimal gravity influence  
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-780); // Almost cancel gravity (800 - 20 = 20 gravity)
+        // Bullets: Completely unaffected by gravity
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Completely cancel world gravity
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
         (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(1000, 1000); // Allow high speeds for bullets
       }
