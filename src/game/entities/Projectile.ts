@@ -15,7 +15,9 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
     scene: Phaser.Scene,
     x: number,
     y: number,
-    projectileState: ProjectileState
+    projectileState: ProjectileState,
+    velocityX?: number,
+    velocityY?: number
   ) {
     super(scene, x, y, 'projectile');
     
@@ -52,6 +54,11 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
 
     // Create visual based on projectile type
     this.createProjectileSprite();
+    
+    // Set initial velocity if provided
+    if (velocityX !== undefined && velocityY !== undefined) {
+      this.setVelocity(velocityX, velocityY);
+    }
 
     // Set up world bounds collision for bouncing projectiles
     if (this.bouncesRemaining > 0) {

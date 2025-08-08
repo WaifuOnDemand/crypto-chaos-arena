@@ -360,10 +360,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.scene,
         spawnX,
         spawnY,
-        projectileState
+        projectileState,
+        velocityX,
+        velocityY
       );
       
-      // Add to projectiles group for collision detection and set velocity after
+      // Add to projectiles group for collision detection
       this.scene.game.events.emit('projectileCreated', { projectile, velocityX, velocityY });
     }
     

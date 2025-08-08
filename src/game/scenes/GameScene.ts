@@ -261,10 +261,8 @@ export class GameScene extends Phaser.Scene {
 
   private setupCombatEvents(): void {
     this.game.events.on('projectileCreated', (data: { projectile: Projectile, velocityX: number, velocityY: number }) => {
-      // Add projectile to group first
+      // Add projectile to group for collision detection
       this.projectiles.add(data.projectile);
-      // Then set velocity after group addition
-      data.projectile.setInitialVelocity(data.velocityX, data.velocityY);
     });
 
     this.game.events.on('meleeAttack', (attack: any) => {
@@ -467,10 +465,11 @@ export class GameScene extends Phaser.Scene {
               explosive: projectileData.weaponType === 'rocket' || projectileData.weaponType === 'grenade',
               explosionRadius: projectileData.weaponType === 'rocket' ? 100 : 50,
               timeAlive: 0
-            }
+            },
+            projectileData.velocity.x,
+            projectileData.velocity.y
           );
           this.projectiles.add(networkProjectile);
-          networkProjectile.setInitialVelocity(projectileData.velocity.x, projectileData.velocity.y);
           break;
           
         case 'playerUpdate':
