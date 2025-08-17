@@ -43,8 +43,8 @@ export class Projectile extends Phaser.Physics.Arcade.Sprite {
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
         (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(800, 800); // Prevent excessive speeds
       } else {
-        // Bullets: Constant velocity with very minimal gravity influence  
-        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-780); // Almost cancel gravity (800 - 20 = 20 gravity)
+        // Bullets: Constant velocity with no gravity influence  
+        (this.body as Phaser.Physics.Arcade.Body).setGravityY(-800); // Completely cancel gravity (800 - 800 = 0 gravity)
         (this.body as Phaser.Physics.Arcade.Body).setDrag(0, 0); // No air resistance
         (this.body as Phaser.Physics.Arcade.Body).setMaxVelocity(1000, 1000); // Allow high speeds for bullets
       }
